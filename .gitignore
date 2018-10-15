@@ -3,3 +3,5 @@
 *.xml
 *.html
 *.svn*
+*.csv
+*.xlsx
