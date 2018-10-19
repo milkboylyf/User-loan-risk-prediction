@@ -15,7 +15,6 @@ from sklearn.linear_model import LogisticRegression
 import numpy as np
 
 
-
 def xgb_feature(X_train, y_train, X_test, y_test=None):
     # 模型参数
     params = {'booster': 'gbtree',
@@ -38,6 +37,7 @@ def xgb_feature(X_train, y_train, X_test, y_test=None):
     vfunc = np.vectorize(lambda x:(x-minmin)/(maxmax-minmin))
     return vfunc(predict)
 
+
 def xgb_feature2(X_train, y_train, X_test, y_test=None):
     # 模型参数
     params = {'booster': 'gbtree',
@@ -59,6 +59,7 @@ def xgb_feature2(X_train, y_train, X_test, y_test=None):
     maxmax = max(predict)
     vfunc = np.vectorize(lambda x:(x-minmin)/(maxmax-minmin))
     return vfunc(predict)
+
 
 def xgb_feature3(X_train, y_train, X_test, y_test=None):
     # 模型参数
@@ -87,6 +88,7 @@ def et_model(X_train, y_train, X_test, y_test=None):
     model = ExtraTreesClassifier(max_features = 'log2', n_estimators = 1000 , n_jobs = -1).fit(X_train,y_train)
     return model.predict_proba(X_test)[:,1]
 
+
 def gbdt_model(X_train, y_train, X_test, y_test=None):
     model = GradientBoostingClassifier(learning_rate = 0.02, max_features = 0.7, n_estimators = 700 , max_depth = 5).fit(X_train,y_train)
     predict = model.predict_proba(X_test)[:,1]
@@ -95,9 +97,11 @@ def gbdt_model(X_train, y_train, X_test, y_test=None):
     vfunc = np.vectorize(lambda x:(x-minmin)/(maxmax-minmin))
     return vfunc(predict)
 
+
 def logistic_model(X_train, y_train, X_test, y_test=None):
     model = LogisticRegression(penalty = 'l2').fit(X_train,y_train)
     return model.predict_proba(X_test)[:,1]
+
 
 def lgb_feature(X_train, y_train, X_test, y_test=None):
     lgb_train = lgb.Dataset(X_train, y_train,categorical_feature={'sex', 'merriage', 'income', 'qq_bound', 'degree', 'wechat_bound','account_grade','industry'})

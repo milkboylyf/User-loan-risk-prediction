@@ -55,53 +55,59 @@ def xgb_feature(train_set_x,train_set_y,test_set_x,test_set_y):
 
     
 if __name__ == '__main__':
-    #%%
+    #%% # 认证信息
     train_auth = pd.read_csv('../AI_risk_train_V3.0/train_auth_info.csv',parse_dates = ['auth_time'])
-#    auth_time = train_auth['auth_time'].map(lambda x:0 if str(x)=='nan' else 1)
-#    auth_time_df = pd.DataFrame();auth_time_df['id'] = train_auth['id'];auth_time_df['auth_time_df'] = auth_time
     auth_idcard = train_auth['id_card'].map(lambda x:0 if str(x)=='nan' else 1)
     auth_idcard_df = pd.DataFrame();auth_idcard_df['id'] = train_auth['id'];auth_idcard_df['auth_idcard_df'] = auth_idcard
     auth_phone = train_auth['phone'].map(lambda x:0 if str(x)=='nan' else 1)
     auth_phone_df = pd.DataFrame();auth_phone_df['id'] = train_auth['id'];auth_idcard_df['auth_phone_df'] = auth_phone
-    #%%
+
+    #%% # 银行卡信息
     train_bankcard = pd.read_csv('../AI_risk_train_V3.0/train_bankcard_info.csv')
     "增加特征"
-    train_bankcard_bank_count = train_bankcard.groupby(by=['id'], as_index=False)['bank_name'].agg({'bankcard_count':lambda x :len(x)})
-    train_bankcard_card_count = train_bankcard.groupby(by=['id'], as_index=False)['card_type'].agg({'card_type_count':lambda x :len(set(x))})
-    train_bankcard_phone_count = train_bankcard.groupby(by=['id'], as_index=False)['phone'].agg({'phone_count':lambda x :len(set(x))})
+    train_bankcard_bank_count = train_bankcard.groupby(by=['id'], as_index=False)['bank_name'].agg({'bankcard_count': 'count'})
+    train_bankcard_card_count = train_bankcard.groupby(by=['id'], as_index=False)['card_type'].agg({'card_type_count': 'count'})
+    train_bankcard_phone_count = train_bankcard.groupby(by=['id'], as_index=False)['phone'].agg({'phone_count':lambda x: 'count'})
 
-    #%%
+    #%% # 信用卡信息
     train_credit = pd.read_csv('../AI_risk_train_V3.0/train_credit_info.csv')
     "增加特征"
     #评分的反序
     train_credit['credit_score_inverse'] = train_credit['credit_score'].map(lambda x :605-x)
     #额度-使用值
     train_credit['can_use'] = train_credit['quota'] - train_credit['overdraft']
-    #%%
-    train_order = pd.read_csv('../AI_risk_train_V3.0/train_order_info.csv',parse_dates=['time_order'])
-    train_order['amt_order'] = train_order['amt_order'].map(lambda x:np.nan if ((x == 'NA')| (x == 'null')) else float(x))
-    
-    train_order['time_order'] = train_order['time_order'].map(lambda x : pd.lib.NaT if (str(x) == '0' or x == 'NA' or x == 'nan')
-                                else (datetime.datetime.strptime(str(x),'%Y-%m-%d %H:%M:%S') if ':' in str(x)
-                                else (datetime.datetime.utcfromtimestamp(int(x[0:10])) + datetime.timedelta(hours = 8))))
+
+    #%% 订单信息
+    train_order = pd.read_csv('../AI_risk_train_V3.0/train_order_info.csv')
+    train_order['amt_order'] = train_order['amt_order'].astype(float)
+    time_order = train_order['time_order'].astype(str)
+
+    judge1 = time_order == '0'
+    judge2 = time_order == 'NA'
+    judge3 = time_order == 'nan'
+    nat_judge = judge1 | judge2 | judge3
+    time_judge = time_order.apply(lambda x: ":" in x)
+    rest_judge = ~(nat_judge | time_judge)
+
+    train_order.loc[nat_judge, 'time_order'] = pd.NaT
+    train_order.loc[time_judge, 'time_order'] = pd.to_datetime(time_order[time_judge])
+    train_order.loc[rest_judge, 'time_order'] = pd.to_datetime(time_order[rest_judge].apply(
+        lambda x:datetime.datetime.utcfromtimestamp(int(x[0:10])) + datetime.timedelta(hours = 8)))
+
+
     train_order_time_max = train_order.groupby(by=['id'], as_index=False)['time_order'].agg({'train_order_time_max':lambda x:max(x)})
     train_order_time_min = train_order.groupby(by=['id'], as_index=False)['time_order'].agg({'train_order_time_min':lambda x:min(x)})
     train_order_type_zaixian = train_order.groupby(by=['id']).apply(lambda x:x['type_pay'][(x['type_pay']=='在线支付').values].count()).reset_index(name = 'type_pay_zaixian')
     train_order_type_huodao = train_order.groupby(by=['id']).apply(lambda x:x['type_pay'][(x['type_pay']=='货到付款').values].count()).reset_index(name = 'type_pay_huodao')
-#    train_order_mean_unit_price = train_order.groupby(by=['id']).apply(lambda x:np.mean(x['unit_price'])).reset_index(name = 'mean_unit_price')
-#    train_order_mean_amt_order = train_order.groupby(by=['id']).apply(lambda x:np.mean(x['amt_order'])).reset_index(name = 'mean_amt_order')
-#    train_order_phone_unique = train_order.groupby(by=['id']).apply(lambda x:x['phone'].nunique()).reset_index(name = '_order_phone_unique')
-#    train_order_many_success = train_order.groupby(by=['id']).apply(lambda x:x['sts_order'][(x['sts_order']=='完成').values].count()).reset_index(name = '_order_many_success')
-#    train_order_many_occuer = train_order.groupby(by=['id']).apply(lambda x:x['sts_order'].count()).reset_index(name = '_order_many_occuer')
 
-    #%%
-    
+    #%% 收货地址信息
     train_recieve = pd.read_csv('../AI_risk_train_V3.0/train_recieve_addr_info.csv')
     train_recieve['region'] = train_recieve['region'].map(lambda x:str(x)[:2])
     tmp_tmp_recieve = pd.crosstab(train_recieve.id,train_recieve.region);tmp_tmp_recieve = tmp_tmp_recieve.reset_index()
     tmp_tmp_recieve_phone_count = train_recieve.groupby(by=['id']).apply(lambda x:x['fix_phone'].count());tmp_tmp_recieve_phone_count=tmp_tmp_recieve_phone_count.reset_index()
     tmp_tmp_recieve_phone_count_unique = train_recieve.groupby(by=['id']).apply(lambda x:x['fix_phone'].nunique());tmp_tmp_recieve_phone_count_unique=tmp_tmp_recieve_phone_count_unique.reset_index()
-    #%%
+
+    #%% 标签信息
     train_target = pd.read_csv('../AI_risk_train_V3.0/train_target.csv',parse_dates = ['appl_sbm_tm'])
     train_user = pd.read_csv('../AI_risk_train_V3.0/train_user_info.csv')
     is_hobby = train_user['hobby'].map(lambda x:0 if str(x)=='nan' else 1)
@@ -119,7 +125,7 @@ if __name__ == '__main__':
     is_hou_in = tmp_tmp['birthday'].map(lambda x:('后' in str(x))*1).reset_index(name='is_hou_in')
     # is_nan = tmp_tmp['birthday'].map(lambda x:(str(x) == 'nan')*1).reset_index(name='is_nan')
     #%%
-    train_user['birthday'] = train_user['birthday'].map(lambda x:datetime.datetime.strptime(str(x),'%Y-%m-%d') if(re.match('19\d{2}-\d{1,2}-\d{1,2}',str(x)) and '-0' not in str(x)) else pd.lib.NaT)
+    train_user['birthday'] = train_user['birthday'].map(lambda x:datetime.datetime.strptime(str(x),'%Y-%m-%d') if(re.match('19\d{2}-\d{1,2}-\d{1,2}',str(x)) and '-0' not in str(x)) else pd.NaT)
 #%%合并    以及 基本特征
     train_data = pd.merge(train_target,train_auth,on=['id'],how='left')
     train_data = pd.merge(train_data,train_user,on=['id'],how='left')
@@ -270,7 +276,7 @@ if __name__ == '__main__':
     #%%
     test_order = pd.read_csv('../AI_risk_test_V3.0/test_order_info.csv',parse_dates = ['time_order'])
     test_order['amt_order'] = test_order['amt_order'].map(lambda x:np.nan if ((x == 'NA')| (x == 'null')) else float(x))
-    test_order['time_order'] = test_order['time_order'].map(lambda x : pd.lib.NaT if (str(x) == '0' or x == 'NA' or x == 'nan')
+    test_order['time_order'] = test_order['time_order'].map(lambda x : pd.NaT if (str(x) == '0' or x == 'NA' or x == 'nan')
                             else (datetime.datetime.strptime(str(x),'%Y-%m-%d %H:%M:%S') if ':' in str(x) 
                             else (datetime.datetime.utcfromtimestamp(int(x[0:10])) + datetime.timedelta(hours = 8))))
     test_order_time_max = test_order.groupby(by=['id'], as_index=False)['time_order'].agg({'test_order_time_max':lambda x:max(x)})
@@ -305,7 +311,7 @@ if __name__ == '__main__':
     is_hou_in = tmp_tmp['birthday'].map(lambda x:('后' in str(x))*1).reset_index(name='is_hou_in')
     # is_nan = tmp_tmp['birthday'].map(lambda x:(str(x) == 'nan')*1).reset_index(name='is_nan')
     #%%
-    test_user['birthday'] = test_user['birthday'].map(lambda x:datetime.datetime.strptime(str(x),'%Y-%m-%d') if( re.match('19\d{2}-\d{1,2}-\d{1,2}',str(x)) and '-0' not in str(x)) else pd.lib.NaT)
+    test_user['birthday'] = test_user['birthday'].map(lambda x:datetime.datetime.strptime(str(x),'%Y-%m-%d') if( re.match('19\d{2}-\d{1,2}-\d{1,2}',str(x)) and '-0' not in str(x)) else pd.NaT)
     
     test_data = pd.merge(test_target,test_auth,on=['id'],how='left')
     test_data = pd.merge(test_data,test_user,on=['id'],how='left')
@@ -446,7 +452,3 @@ if __name__ == '__main__':
     ans['PROB'] = ans['PROB'].map(lambda x:(x-minmin)/(maxmax-minmin))
     ans['PROB'] = ans['PROB'].map(lambda x:'%.4f' % x)
     ans.to_csv('../result/04094test.csv',index=None)
-    
-    
-    
-    
